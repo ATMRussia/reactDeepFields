@@ -1,0 +1,41 @@
+{
+  "name": "reactDeepFields",
+  "description": "Form with validators, react components, and ready to use value object on any level. Allow to create deep json objects with multidimensonal arrays.",
+  "version": "1.0.1",
+  "scripts": {
+    "makedoc": "npx jsdoc2md -f index.js > Field.md"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "eslint": "^7.13.0",
+    "eslint-config-standard": "^14.1.1",
+    "eslint-loader": "^4.0.2",
+    "eslint-plugin-import": "^2.22.1",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-promise": "^4.2.1",
+    "eslint-plugin-standard": "^4.1.0",
+    "jsdoc-to-markdown": "^6.0.1"
+  },
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://gogs@git.ans.aero:Libs/reactDeepFields.git"
+  },
+  "files": [
+    "index.js",
+    "Field.md",
+    "Config.md"
+  ],
+  "keywords": [
+    "react",
+    "form",
+    "json",
+    "values",
+    "value",
+    "deep",
+    "fast"
+  ],
+  "main": "index.js",
+  "author": "Aleksey Druzhinin <druzhinin@ans.aero>",
+  "phone": "+79058252502"
+}
