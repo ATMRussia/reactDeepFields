@@ -33,11 +33,14 @@ module.exports = function (React, cfg, values) {
         this.type = 'object'
         this.props = {}
         val = { ...val } || {}
+        var propsCnt = 0
         for (var key in props) {
+          propsCnt++
           tField.props[key] = new Field(props[key], val[key], key, tField)
-          //delete val[key]
+           delete val[key]
         }
-        //this.state.value = val
+        if (propsCnt)
+          this.state.value = val
       } else {
         this.type = type || 'prop'
         this.state.value = val
@@ -276,7 +279,13 @@ module.exports = function (React, cfg, values) {
       }
 
       if (this.config.react) {
+        if (typeof (this.config.react) !== 'function') {
+          console.log('.react = "%s"', this.config.react)
+          throw new Error('react prop is not a function')
+        }
         newReactElement = React.createElement(this.Assign(this.config.react), props, ...childs)
+        // props.reactFunc = this.config.react
+        // newReactElement = React.createElement(WrapperDeepField, props, ...childs)
       } else {
         newReactElement = React.createElement(React.Fragment, null, ...childs)
       }
