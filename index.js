@@ -180,7 +180,7 @@ module.exports = function (React, cfg, values) {
     async validate () {
       if (!this.config.validate) return
       try {
-        await this.config.validate(this.state.value)
+        await this.config.validate.apply(this, [this.state.value])
         this.state.error && this.setState({ ...this.state, error: null })
         return
       } catch (err) {
