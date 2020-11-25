@@ -37,10 +37,11 @@ module.exports = function (React, cfg, values) {
         for (var key in props) {
           propsCnt++
           tField.props[key] = new Field(props[key], val[key], key, tField)
-           delete val[key]
+          delete val[key]
         }
-        if (propsCnt)
+        if (propsCnt) {
           this.state.value = val
+        }
       } else {
         this.type = type || 'prop'
         this.state.value = val
@@ -166,7 +167,7 @@ module.exports = function (React, cfg, values) {
      */
     get errorProps () {
       return {
-        error: !!this.state.error,
+        error: this.state.error ? true : null,
         helperText: this.state.error ? this.state.error.message : null
       }
     }
