@@ -160,6 +160,20 @@ module.exports = function (React, cfg, values) {
       }
     }
 
+
+    /**
+     * set value - Set value of this field, validate
+     *
+     * @param  {type} val new value
+     * @return {void}
+     */
+    set value(val) {
+      const oldVal = this.state.value
+      this.state.value = val
+      this.config.onChange && this.config.onChange.apply(this, [val])
+      oldVal !== val && this.validate()
+    }
+
     /**
      * get errorProps - Get object with error and helperText props
      *
