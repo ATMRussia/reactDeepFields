@@ -199,9 +199,11 @@ module.exports = function (React, cfg, values) {
       try {
         await this.config.validate.apply(this, [this.state.value])
         !skipSetState && this.state.error && this.setState({ ...this.state, error: null })
+        delete this.state.error
         return
       } catch (err) {
-        !skipSetState && this.setState({ ...this.state, error: err })
+        this.state.error = err
+        !skipSetState && this.setState({ ...this.state })
         return err
       }
     }
