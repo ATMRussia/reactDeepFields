@@ -1,7 +1,7 @@
 {
   "name": "reactDeepFields",
   "description": "Form with validators, react components, and ready to use value object on any level. Allow to create deep json objects with multidimensonal arrays.",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "scripts": {
     "makedoc": "npx jsdoc2md -f index.js > Field.md"
   },

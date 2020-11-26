@@ -171,7 +171,10 @@ module.exports = function (React, cfg, values) {
       const oldVal = this.state.value
       this.state.value = val
       this.config.onChange && this.config.onChange.apply(this, [val])
-      oldVal !== val && this.validate()
+      if (oldVal !== val) {
+        this.validate(true)
+        this.update()
+      }
     }
 
     /**
@@ -191,14 +194,14 @@ module.exports = function (React, cfg, values) {
      *
      * @return {Error}  Optional error
      */
-    async validate () {
+    async validate (skipSetState) {
       if (!this.config.validate) return
       try {
         await this.config.validate.apply(this, [this.state.value])
-        this.state.error && this.setState({ ...this.state, error: null })
+        !skipSetState && this.state.error && this.setState({ ...this.state, error: null })
         return
       } catch (err) {
-        this.setState({ ...this.state, error: err })
+        !skipSetState && this.setState({ ...this.state, error: err })
         return err
       }
     }
