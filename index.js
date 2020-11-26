@@ -172,8 +172,9 @@ module.exports = function (React, cfg, values) {
       this.state.value = val
       this.config.onChange && this.config.onChange.apply(this, [val])
       if (oldVal !== val) {
-        this.validate(true)
-        this.update()
+        this.validate(true).then(() => {
+          this.update()
+        })
       }
     }
 
