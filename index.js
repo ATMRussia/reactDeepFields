@@ -160,14 +160,13 @@ module.exports = function (React, cfg, values) {
       }
     }
 
-
     /**
      * set value - Set value of this field, validate
      *
      * @param  {type} val new value
      * @return {void}
      */
-    set value(val) {
+    set value (val) {
       const oldVal = this.state.value
       this.state.value = val
       oldVal !== val && this.validate(true).then(() => {
@@ -214,20 +213,18 @@ module.exports = function (React, cfg, values) {
      */
     async validateAll () {
       var errors = []
-      const pushIfError = async (field, validateFuncName) => {
-        const err = await field[validateFuncName]()
-        if (err && err instanceof Array) {
-          errors = errors.concat(err)
-        } else if (err) {
-          errors.push({
-            field: field,
-            err: err
-          })
-        }
+
+      try {
+        await this.validate(this.state.value)
+      } catch (e) {
+        errors.push({
+          field: this,
+          err: e
+        })
       }
-      await pushIfError(this, 'validate')
+
       for (var key in this.props) {
-        await pushIfError(this.props[key], 'validateAll')
+        errors = errors.concat(await this.props[key].validateAll())
       }
       return errors
     }
