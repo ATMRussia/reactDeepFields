@@ -1,4 +1,13 @@
-module.exports = function (React, cfg, values) {
+module.exports = function (React, cfg, values, mainOptions) {
+  const options = {
+    reqErrorText: 'Поле должно быть заполненно',
+    ...mainOptions
+  }
+
+  const requiredValidator = async (val) => {
+    if (!val) throw new Error(options.reqErrorText)
+  }
+
   class Field {
     /**
      * constructor - Create new Field instance
@@ -10,12 +19,19 @@ module.exports = function (React, cfg, values) {
      * @return {Field}        this field
      */
     constructor (config, value, nameOverride, parent) {
-      const { props, newItem, name, type, ...stripedConfig } = config
+      const {
+        props, newItem, name, type, validate,
+        onCreate, ...stripedConfig
+      } = config
       const tField = this
       this.config = stripedConfig
       this.parent = parent
       this.name = nameOverride || name
       this.state = {}
+      this.validators = []
+      validate && this.validators.push(validate)
+      this.onCreateFunctions = [...((parent && parent.onCreateFunctions) || [])]
+      onCreate && this.onCreateFunctions.push(onCreate)
 
       // default setState function
       this.setState = (newState) => {
@@ -44,11 +60,21 @@ module.exports = function (React, cfg, values) {
         }
       } else {
         this.type = type || 'prop'
-        this.state.value = val
+        if (type === 'date') {
+          this.state.value = val ? new Date(val) : val
+        } else {
+          this.state.value = val
+        }
       }
       this.path = this.makePath()
       this.pathStr = this.path.join('.')
-      this.validate()
+
+      this.config.req && this.validators.unshift(requiredValidator)
+
+      this.onCreateFunctions.forEach((func) => {
+        func.apply(this)
+      })
+      !options.serverSide && this.validate()
     }
 
     /**
@@ -160,6 +186,27 @@ module.exports = function (React, cfg, values) {
       }
     }
 
+    async getUpdates (parentUpd) {
+      const upd = parentUpd || {}
+      if (this.type === 'array') {
+        const val = []
+        for (var i = 0; i < this.props.length; i++) {
+          val.push(this.props[i].value)
+        }
+        // override array
+        upd[this.pathStr] = val
+      } else if (this.type === 'object') {
+        for (var key in this.props) {
+          !this.props[key].skipValue && await this.props[key].getUpdates(upd)
+        }
+      } else {
+        if (!this.skipValue) {
+          upd[this.pathStr] = this.state.value
+        }
+      }
+      return upd
+    }
+
     /**
      * set value - Set value of this field, validate
      *
@@ -193,17 +240,18 @@ module.exports = function (React, cfg, values) {
      * @return {Error}  Optional error
      */
     async validate (skipSetState) {
-      if (!this.config.validate) return
-      try {
-        await this.config.validate.apply(this, [this.state.value])
-        !skipSetState && this.state.error && this.setState({ ...this.state, error: null })
-        delete this.state.error
-        return
-      } catch (err) {
-        this.state.error = err
-        !skipSetState && this.setState({ ...this.state })
-        return err
+      if (this.skipValidate) return
+      for (var i = 0; i < this.validators.length; i++) {
+        try {
+          await this.validators[i].apply(this, [this.state.value])
+        } catch (err) {
+          this.state.error = err
+          !skipSetState && this.setState({ ...this.state })
+          return err
+        }
       }
+      !skipSetState && this.state.error && this.setState({ ...this.state, error: null })
+      delete this.state.error
     }
 
     /**
@@ -211,20 +259,17 @@ module.exports = function (React, cfg, values) {
      *
      * @return {Array}  Errors array
      */
-    async validateAll () {
-      var errors = []
+    async validateAll (parentErrors) {
+      var errors = parentErrors || []
 
-      try {
-        await this.validate(this.state.value)
-      } catch (e) {
-        errors.push({
-          field: this,
-          err: e
-        })
-      }
+      const thisErr = await this.validate(true)
+      thisErr && errors.push({
+        field: this,
+        err: thisErr
+      })
 
       for (var key in this.props) {
-        errors = errors.concat(await this.props[key].validateAll())
+        await this.props[key].validateAll(errors)
       }
       return errors
     }
