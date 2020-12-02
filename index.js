@@ -307,7 +307,7 @@ module.exports = function (React, cfg, values, mainOptions) {
     makePath () {
       var path = []
       this.toParent((fieldObj) => {
-        path.push(fieldObj.name)
+        fieldObj.parent && path.push(fieldObj.name)
       })
       return path.reverse()
     }
