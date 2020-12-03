@@ -6,6 +6,7 @@
 * [Field](#Field)
     * [new Field(config, value, nameOverride, parent)](#new_Field_new)
     * [.value](#Field+value) ⇒ <code>Any</code>
+    * [.value](#Field+value) ⇒ <code>void</code>
     * [.errorProps](#Field+errorProps) ⇒ <code>Object</code>
     * [.form](#Field+form) ⇒ [<code>Field</code>](#Field)
     * [.Component](#Field+Component) ⇒ <code>function</code>
@@ -14,6 +15,7 @@
     * [.rmMember(idx, count)](#Field+rmMember) ⇒ <code>void</code>
     * [.drop()](#Field+drop) ⇒ <code>void</code>
     * [.toParent(iter)](#Field+toParent) ⇒ <code>void</code>
+    * [.call()](#Field+call) ⇒ <code>any</code>
     * [.validate()](#Field+validate) ⇒ <code>Error</code>
     * [.validateAll()](#Field+validateAll) ⇒ <code>Array</code>
     * [.eachParent(iter)](#Field+eachParent) ⇒ <code>void</code>
@@ -41,6 +43,17 @@ get value - Value of this field and child fields
 
 **Kind**: instance property of [<code>Field</code>](#Field)  
 **Returns**: <code>Any</code> - value  
+<a name="Field+value"></a>
+
+### field.value ⇒ <code>void</code>
+set value - Set value of this field, validate
+
+**Kind**: instance property of [<code>Field</code>](#Field)  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| val | <code>type</code> | new value |
+
 <a name="Field+errorProps"></a>
 
 ### field.errorProps ⇒ <code>Object</code>
@@ -112,6 +125,18 @@ toParent - Iterate all fields up to top
 | Param | Type | Description |
 | --- | --- | --- |
 | iter | <code>function</code> | function(Field){} |
+
+<a name="Field+call"></a>
+
+### field.call() ⇒ <code>any</code>
+call - Call function from config with context = this field
+
+**Kind**: instance method of [<code>Field</code>](#Field)  
+**Returns**: <code>any</code> - function result  
+
+| Param | Type | Description |
+| --- | --- | --- |
+| ...args | <code>any</code> | first argument is function name |
 
 <a name="Field+validate"></a>
 

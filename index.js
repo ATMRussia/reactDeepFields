@@ -235,6 +235,20 @@ module.exports = function (React, cfg, values, mainOptions) {
     }
 
     /**
+     * call - Call function from config with context = this field
+     *
+     * @param  {any} ...args first argument is function name
+     * @return {any}         function result
+     */
+    call (...args) {
+      const name = args.shift()
+      if (!name || !this.config[name]) return
+
+      console.log('call', name, args)
+      return this.config[name].apply(this, args)
+    }
+
+    /**
      * async validate - Validate this field, update state and readraw React Component
      *
      * @return {Error}  Optional error
@@ -245,9 +259,12 @@ module.exports = function (React, cfg, values, mainOptions) {
         try {
           await this.validators[i].apply(this, [this.state.value])
         } catch (err) {
-          this.state.error = err
-          !skipSetState && this.setState({ ...this.state })
-          return err
+          // skip error
+          if (!this.config.silentValidate) {
+            this.state.error = err
+            !skipSetState && this.setState({ ...this.state })
+            return err
+          }
         }
       }
       !skipSetState && this.state.error && this.setState({ ...this.state, error: null })
