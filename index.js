@@ -260,7 +260,7 @@ module.exports = function (React, cfg, values, mainOptions) {
           await this.validators[i].apply(this, [this.state.value])
         } catch (err) {
           // skip error
-          if (!this.config.silentValidate) {
+          if (!this.silentValidate) {
             this.state.error = err
             !skipSetState && this.setState({ ...this.state })
             return err
