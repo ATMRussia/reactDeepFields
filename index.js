@@ -1,7 +1,8 @@
 module.exports = function (React, cfg, values, mainOptions) {
   const options = {
     reqErrorText: 'Поле должно быть заполненно',
-    ...mainOptions
+    ...mainOptions,
+    serverSide: mainOptions.serverSide || !React
   }
 
   const requiredValidator = async (val) => {
@@ -20,8 +21,8 @@ module.exports = function (React, cfg, values, mainOptions) {
      */
     constructor (config, value, nameOverride, parent) {
       const {
-        props, newItem, name, type, validate,
-        onCreate, ...stripedConfig
+        props, newItem, name, type, validate, nextTickValidate,
+        onCreate, roles, steps, readOnlySteps, ...stripedConfig
       } = config
       const tField = this
       this.config = stripedConfig
@@ -29,7 +30,12 @@ module.exports = function (React, cfg, values, mainOptions) {
       this.name = nameOverride || name
       this.state = {}
       this.validators = []
+      this.roles = roles
+      this.steps = steps || (parent && parent.steps)
+      this.readOnlySteps = readOnlySteps || (parent && parent.readOnlySteps)
+      this.step = (parent && parent.step) || (value && value.step) || 1
       validate && this.validators.push(validate)
+      nextTickValidate && this.validators.push(nextTickValidate)
       this.onCreateFunctions = [...((parent && parent.onCreateFunctions) || [])]
       onCreate && this.onCreateFunctions.push(onCreate)
 
@@ -71,10 +77,82 @@ module.exports = function (React, cfg, values, mainOptions) {
 
       this.config.req && this.validators.unshift(requiredValidator)
 
+      this.callCreateFunctions()
+      this.setupRoleProperties()
+      if (!options.serverSide) {
+        // some fields needs to run validation only in next tick
+        !nextTickValidate ? this.validate() : setTimeout(() => {
+          this.validate()
+        }, 0)
+      }
+    }
+
+    callCreateFunctions (recursiveWithChilds) {
       this.onCreateFunctions.forEach((func) => {
         func.apply(this)
       })
-      !options.serverSide && this.validate()
+      if (!recursiveWithChilds) return
+      for (var key in this.props) {
+        this.props[key].callCreateFunctions(true)
+      }
+    }
+
+    setStep(step) {
+      if (step === this.step) return
+      this.step = step
+      for (var key in this.props) {
+        this.props[key].setStep(step)
+      }
+      this.setupRoleProperties()
+    }
+
+    setupRoleProperties() {
+      const before = {};
+      ['silentValidate', 'skipValidate', 'skipValue', 'readOnly'].forEach((key) => {
+        this[key] = !!this[key]
+        before[key] = this[key]
+      })
+
+      if (this.roles) {
+        var foundRole = false;
+        (options.userRoles || []).forEach((rusRole) => {
+          foundRole = foundRole || this.roles.includes(rusRole)
+        })
+        var foundSteps = true
+        if (this.steps && !this.steps.includes(this.step)) {
+          foundSteps = false
+        }
+        const found = foundRole && foundSteps
+        if (this.config.silentValidate && foundSteps) {
+          this.silentValidate = true
+          this.skipValidate = false
+        } else {
+          this.skipValidate = !found
+        }
+        this.skipValue = !found
+        this.readOnly = !found || this.config.readOnly
+        if (this.readOnlySteps) {
+          this.readOnly = this.readOnly || this.readOnlySteps.includes(this.step)
+        }
+
+        this.dbg = {
+          roles: options.userRoles,
+          foundRole: foundRole,
+          found: found,
+          before: before
+        }
+      }else if (this.readOnlySteps) {
+        this.readOnly = this.readOnlySteps.includes(this.step) || this.config.readOnly
+      }
+
+      var changed = false
+      for (var key in before) {
+        changed = changed || (before[key] !== this[key])
+      }
+      this.dbg = this.dbg || {}
+      this.dbg.changed = changed
+
+      changed && this.update()
     }
 
     /**
@@ -180,6 +258,9 @@ module.exports = function (React, cfg, values, mainOptions) {
         for (var key in this.props) {
           val[key] = this.props[key].value
         }
+        if (!this.parent) {
+          val.step = this.step
+        }
         return val
       } else {
         return this.state.value
@@ -203,6 +284,10 @@ module.exports = function (React, cfg, values, mainOptions) {
         if (!this.skipValue) {
           upd[this.pathStr] = this.state.value
         }
+      }
+      // update form step
+      if (this.config.useSteps) {
+        upd.step = this.step || 1
       }
       return upd
     }
@@ -244,7 +329,6 @@ module.exports = function (React, cfg, values, mainOptions) {
       const name = args.shift()
       if (!name || !this.config[name]) return
 
-      console.log('call', name, args)
       return this.config[name].apply(this, args)
     }
 
@@ -260,7 +344,9 @@ module.exports = function (React, cfg, values, mainOptions) {
           await this.validators[i].apply(this, [this.state.value])
         } catch (err) {
           // skip error
-          if (!this.silentValidate) {
+          if (this.silentValidate) {
+            console.log('silentValidate', err)
+          } else {
             this.state.error = err
             !skipSetState && this.setState({ ...this.state })
             return err
