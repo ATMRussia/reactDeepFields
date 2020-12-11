@@ -291,24 +291,19 @@ module.exports = function (React, cfg, values, mainOptions) {
       this.eachParent(iter)
     }
 
-    /**
-     * get value - Value of this field and child fields
-     *
-     * @return {Any}  value
-     */
-    get value () {
+    _getValue (useFilter) {
       var val
       if (this.type === 'array') {
         val = []
         this.props.forEach((child) => {
-          val.push(child.value)
+          val.push(child._getValue(useFilter))
         })
         return val
       } else if (this.type === 'object') {
         val = {}
         for (var key in this.props) {
-          if (!this.props[key].skipValue) {
-            val[key] = this.props[key].value
+          if (!this.props[key].skipValue || !useFilter) {
+            val[key] = this.props[key]._getValue(useFilter)
           }
         }
         if (!this.parent) {
@@ -318,6 +313,25 @@ module.exports = function (React, cfg, values, mainOptions) {
       } else {
         return this.state.value
       }
+    }
+
+    /**
+     * get value - Value of this field and child fields
+     *
+     * @return {Any}  value
+     */
+    get value () {
+      return this._getValue(true)
+    }
+
+
+    /**
+     * get fullValue - Value of this field and child fields without filter
+     *
+     * @return {Any}  value without filter
+     */
+    get fullValue () {
+      return this._getValue(false)
     }
 
     async getUpdates (parentUpd) {
