@@ -22,7 +22,7 @@ module.exports = function (React, cfg, values, mainOptions) {
     constructor (config, value, nameOverride, parent) {
       const {
         props, newItem, name, type, validate, nextTickValidate,
-        onCreate, roles, steps, readOnlySteps, ...stripedConfig
+        onCreate, roleAndSteps, steps, readOnlySteps, ...stripedConfig
       } = config
       const tField = this
       this.config = stripedConfig
@@ -30,7 +30,7 @@ module.exports = function (React, cfg, values, mainOptions) {
       this.name = nameOverride || name
       this.state = {}
       this.validators = []
-      this.roles = roles
+      this.roleAndSteps = roleAndSteps || (parent && parent.roleAndSteps) || {}
       this.steps = steps || (parent && parent.steps)
       this.readOnlySteps = readOnlySteps || (parent && parent.readOnlySteps)
       this.step = (parent && parent.step) || (value && value.step) || 1
@@ -75,8 +75,6 @@ module.exports = function (React, cfg, values, mainOptions) {
       this.path = this.makePath()
       this.pathStr = this.path.join('.')
 
-      this.config.req && this.validators.unshift(requiredValidator)
-
       this.callCreateFunctions()
       this.setupRoleProperties()
       if (!options.serverSide) {
@@ -84,6 +82,10 @@ module.exports = function (React, cfg, values, mainOptions) {
         !nextTickValidate ? this.validate() : setTimeout(() => {
           this.validate()
         }, 0)
+      }
+
+      if (!this.parent) {
+        this.stepValues = []
       }
     }
 
@@ -97,33 +99,89 @@ module.exports = function (React, cfg, values, mainOptions) {
       }
     }
 
-    setStep(step) {
-      if (step === this.step) return
-      this.step = step
+    async pushStep () {
+      const errors = await this.validateAll([], false)
+      if (errors.length) {
+        return errors
+      }
+      // this.setStep(step)
+      const lastStepVal = this.stepValues[this.stepValues.length - 1]
+      if (lastStepVal && this.step === lastStepVal.step) {
+        lastStepVal.value = this.value
+      } else {
+        this.stepValues.push({
+          step: this.step,
+          value: this.value
+        })
+      }
+      return []
+    }
+
+    setStep (step) {
+      const newStep = step || this.step
+      if (newStep === this.step) {
+        return
+      }
+
+      this.step = newStep
       for (var key in this.props) {
-        this.props[key].setStep(step)
+        this.props[key].setStep(newStep)
       }
       this.setupRoleProperties()
     }
 
-    setupRoleProperties() {
+    setValues (values) {
+      switch (this.type) {
+        case 'array' : {
+          const newValuesLen = ((values && values.length) || 0)
+          while (newValuesLen > this.props.length) {
+            this.rmMember(this.props.length - 1, 1)
+          }
+          for (let i = 0; i < newValuesLen; i++) {
+            if (this.props[i]) {
+              this.props[i].setValues(values[i])
+            } else {
+              this.pushMember(values[i])
+            }
+          }
+        }
+          break
+        case 'object' :
+          for (const key in this.props) {
+            values[key] !== undefined && this.props[key].setValues(values[key])
+          }
+          break
+        case 'date' :
+          this.state.value = values ? new Date(values) : values
+          break
+        default : {
+          this.state.value = values
+        }
+      }
+    }
+
+    allowedAt (rolesObj) {
+      if (!rolesObj) return false
+      const allowedAtSteps = [];
+      (options.userRoles || []).forEach((role) => {
+        rolesObj[role] && rolesObj[role].forEach((step) => {
+          !allowedAtSteps.includes(step) && allowedAtSteps.push(step)
+        })
+      })
+      return allowedAtSteps.includes(this.step)
+    }
+
+    setupRoleProperties () {
       const before = {};
       ['silentValidate', 'skipValidate', 'skipValue', 'readOnly'].forEach((key) => {
         this[key] = !!this[key]
         before[key] = this[key]
       })
 
-      if (this.roles) {
-        var foundRole = false;
-        (options.userRoles || []).forEach((rusRole) => {
-          foundRole = foundRole || this.roles.includes(rusRole)
-        })
-        var foundSteps = true
-        if (this.steps && !this.steps.includes(this.step)) {
-          foundSteps = false
-        }
-        const found = foundRole && foundSteps
-        if (this.config.silentValidate && foundSteps) {
+      if (this.roleAndSteps || this.steps) {
+        const found = this.allowedAt(this.roleAndSteps)
+        const silentValidate = this.allowedAt(this.config.silentValidate)
+        if (silentValidate) {
           this.silentValidate = true
           this.skipValidate = false
         } else {
@@ -131,18 +189,12 @@ module.exports = function (React, cfg, values, mainOptions) {
         }
         this.skipValue = !found
         this.readOnly = !found || this.config.readOnly
-        if (this.readOnlySteps) {
-          this.readOnly = this.readOnly || this.readOnlySteps.includes(this.step)
-        }
+        const readOnlyStep = this.allowedAt(this.readOnlySteps)
+        this.readOnly = this.readOnly || readOnlyStep
 
-        this.dbg = {
-          roles: options.userRoles,
-          foundRole: foundRole,
-          found: found,
-          before: before
-        }
-      }else if (this.readOnlySteps) {
-        this.readOnly = this.readOnlySteps.includes(this.step) || this.config.readOnly
+        this.dbg = { found, silentValidate, readOnlyStep }
+      } else if (this.readOnlySteps) {
+        this.readOnly = this.allowedAt(this.readOnlySteps) || this.config.readOnly
       }
 
       var changed = false
@@ -256,7 +308,9 @@ module.exports = function (React, cfg, values, mainOptions) {
       } else if (this.type === 'object') {
         val = {}
         for (var key in this.props) {
-          val[key] = this.props[key].value
+          if (!this.props[key].skipValue) {
+            val[key] = this.props[key].value
+          }
         }
         if (!this.parent) {
           val.step = this.step
@@ -308,6 +362,32 @@ module.exports = function (React, cfg, values, mainOptions) {
     }
 
     /**
+     * get haveErrors - Have at least one error
+     *
+     * @return {Boolean}
+     */
+    get haveErrors () {
+      if (this.state.error) return true
+      for (const key in this.props) {
+        if (this.props[key].haveErrors) return true
+      }
+      return false
+    }
+
+    async stepAndValue (step, val) {
+      const prevVal = this.state.value
+      this.state.value = val
+      const errors = await this.form.pushStep()
+      this.state.value = prevVal
+      if (errors.length) {
+        // fallback
+        return
+      }
+      this.value = val // set value and trigger validators
+      this.form.setStep(step) // go to new step
+    }
+
+    /**
      * get errorProps - Get object with error and helperText props
      *
      * @return {Object}  error and helperText
@@ -339,9 +419,13 @@ module.exports = function (React, cfg, values, mainOptions) {
      */
     async validate (skipSetState) {
       if (this.skipValidate) return
-      for (var i = 0; i < this.validators.length; i++) {
+      let validators = this.validators
+      if (this.config.req) {
+        validators = [requiredValidator, ...validators]
+      }
+      for (var i = 0; i < validators.length; i++) {
         try {
-          await this.validators[i].apply(this, [this.state.value])
+          await validators[i].apply(this, [this.state.value])
         } catch (err) {
           // skip error
           if (this.silentValidate) {
@@ -362,10 +446,10 @@ module.exports = function (React, cfg, values, mainOptions) {
      *
      * @return {Array}  Errors array
      */
-    async validateAll (parentErrors) {
+    async validateAll (parentErrors, skipSetState) {
       var errors = parentErrors || []
 
-      const thisErr = await this.validate(true)
+      const thisErr = await this.validate(skipSetState || true)
       thisErr && errors.push({
         field: this,
         err: thisErr
