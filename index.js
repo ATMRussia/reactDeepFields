@@ -22,7 +22,7 @@ module.exports = function (React, cfg, values, mainOptions) {
     constructor (config, value, nameOverride, parent) {
       const {
         props, newItem, name, type, validate, nextTickValidate,
-        onCreate, roleAndSteps, steps, readOnlySteps, ...stripedConfig
+        onCreate, roleAndSteps, readOnlySteps, ...stripedConfig
       } = config
       const tField = this
       this.config = stripedConfig
@@ -30,8 +30,7 @@ module.exports = function (React, cfg, values, mainOptions) {
       this.name = nameOverride || name
       this.state = {}
       this.validators = []
-      this.roleAndSteps = roleAndSteps || (parent && parent.roleAndSteps) || {}
-      this.steps = steps || (parent && parent.steps)
+      this.roleAndSteps = roleAndSteps || (parent && parent.roleAndSteps)
       this.readOnlySteps = readOnlySteps || (parent && parent.readOnlySteps)
       this.step = (parent && parent.step) || (value && value.step) || 1
       validate && this.validators.push(validate)
@@ -178,7 +177,7 @@ module.exports = function (React, cfg, values, mainOptions) {
         before[key] = this[key]
       })
 
-      if (this.roleAndSteps || this.steps) {
+      if (this.roleAndSteps) {
         const found = this.allowedAt(this.roleAndSteps)
         const silentValidate = this.allowedAt(this.config.silentValidate)
         if (silentValidate) {
