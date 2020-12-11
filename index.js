@@ -2,7 +2,7 @@ module.exports = function (React, cfg, values, mainOptions) {
   const options = {
     reqErrorText: 'Поле должно быть заполненно',
     ...mainOptions,
-    serverSide: mainOptions.serverSide || !React
+    serverSide: (mainOptions && mainOptions.serverSide) || !React
   }
 
   const requiredValidator = async (val) => {
