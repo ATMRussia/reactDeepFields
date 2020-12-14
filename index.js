@@ -324,7 +324,6 @@ module.exports = function (React, cfg, values, mainOptions) {
       return this._getValue(true)
     }
 
-
     /**
      * get fullValue - Value of this field and child fields without filter
      *
@@ -588,6 +587,8 @@ module.exports = function (React, cfg, values, mainOptions) {
       return wrapperFunc
     }
   }
+
+  cfg.extend && cfg.extend(Field)
 
   if (cfg) return new Field(cfg, values)
   return Field
