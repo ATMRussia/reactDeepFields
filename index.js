@@ -99,21 +99,17 @@ module.exports = function (React, cfg, values, mainOptions) {
     }
 
     async pushStep () {
-      const errors = await this.validateAll([], false)
-      if (errors.length) {
-        return errors
-      }
-      // this.setStep(step)
       const lastStepVal = this.stepValues[this.stepValues.length - 1]
       if (lastStepVal && this.step === lastStepVal.step) {
         lastStepVal.value = this.value
+        lastStepVal.upd = this.getUpdates()
       } else {
         this.stepValues.push({
           step: this.step,
-          value: this.value
+          value: this.value,
+          upd: this.getUpdates()
         })
       }
-      return []
     }
 
     setStep (step) {
@@ -333,7 +329,7 @@ module.exports = function (React, cfg, values, mainOptions) {
       return this._getValue(false)
     }
 
-    async getUpdates (parentUpd) {
+    getUpdates (parentUpd) {
       const upd = parentUpd || {}
       if (this.type === 'array') {
         const val = []
@@ -344,7 +340,7 @@ module.exports = function (React, cfg, values, mainOptions) {
         upd[this.pathStr] = val
       } else if (this.type === 'object') {
         for (var key in this.props) {
-          !this.props[key].skipValue && await this.props[key].getUpdates(upd)
+          !this.props[key].skipValue && this.props[key].getUpdates(upd)
         }
       } else {
         if (!this.skipValue) {
@@ -355,6 +351,15 @@ module.exports = function (React, cfg, values, mainOptions) {
       if (this.config.useSteps) {
         upd.step = this.step || 1
       }
+      return upd
+    }
+
+    getStepsUpdate () {
+      const upd = {}
+      this.stepValues.forEach((stepValue) => {
+        Object.assign(upd, stepValue.upd)
+      })
+      Object.assign(upd, this.getUpdates())
       return upd
     }
 
@@ -389,14 +394,16 @@ module.exports = function (React, cfg, values, mainOptions) {
     async stepAndValue (step, val) {
       const prevVal = this.state.value
       this.state.value = val
-      const errors = await this.form.pushStep()
-      this.state.value = prevVal
+
+      const errors = await this.validateAll([], false)
       if (errors.length) {
+        this.state.value = prevVal
         // fallback
         return
       }
-      this.value = val // set value and trigger validators
+      await this.form.pushStep()
       this.form.setStep(step) // go to new step
+      this.value = val // set value and trigger validators
     }
 
     /**
