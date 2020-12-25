@@ -100,6 +100,7 @@ module.exports = function (React, cfg, values, mainOptions) {
 
     pushStep () {
       const lastStepVal = this.stepValues[this.stepValues.length - 1]
+      options.dbg && console.log(`pushStep lastStep:${lastStepVal && lastStepVal.step} curStep:${this.step}`)
       if (lastStepVal && this.step === lastStepVal.step) {
         lastStepVal.value = this.value
         lastStepVal.upd = this.getUpdates()
@@ -110,9 +111,11 @@ module.exports = function (React, cfg, values, mainOptions) {
           upd: this.getUpdates()
         })
       }
+      options.dbg && console.log('stepValues:', [...this.stepValues])
     }
 
     setStep (step) {
+      options.dbg && console.log('setStep', step)
       const newStep = step || this.step
       if (newStep === this.step) {
         return
@@ -309,7 +312,8 @@ module.exports = function (React, cfg, values, mainOptions) {
         for (var key in this.props) {
           if (!this.props[key].skipValue || !useFilter) {
             val[key] = this.props[key]._getValue(useFilter)
-          } else if (this.allowSetNull && this.props[key]._getValue(useFilter) === null) {
+          } else if (this.allowSetNull && (this.props[key]._getValue(useFilter) === null)) {
+            console.log('setNull!', this.name)
             val[key] = null
           }
         }
@@ -406,15 +410,20 @@ module.exports = function (React, cfg, values, mainOptions) {
       const prevVal = this.state.value
       this.state.value = val
 
-      const errors = await this.validateAll([], false)
+      const errors = await this.form.validateAll([], false)
+      options.dbg && console.log('stepAndValue2 errs', errors, this, this.form)
       if (errors.length) {
-        this.state.value = prevVal
         // fallback
-        return
+        this.value = prevVal
+        this.setupRoleProperties()
+        options.dbg && console.log('stepAndValue bad return prevVal', prevVal)
+        return errors
       }
+      options.dbg && console.log('stepAndValue good')
       this.form.pushStep()
       this.form.setStep(step) // go to new step
       this.value = val // set value and trigger validators
+      return null
     }
 
     /**
@@ -447,9 +456,12 @@ module.exports = function (React, cfg, values, mainOptions) {
      *
      * @return {Error}  Optional error
      */
-    async validate (skipSetState) {
-      if (this.skipValidate) return
-      const err = await this.forceValidate()
+    async validate (skipSetState, parentActions) {
+      if (this.skipValidate) {
+        // options.dbg && console.log('skipValidate', this.name)
+        return
+      }
+      const err = await this.forceValidate(parentActions)
       if (err) {
         this.state.error = err
         !skipSetState && this.setState({ ...this.state })
@@ -460,18 +472,20 @@ module.exports = function (React, cfg, values, mainOptions) {
       return err
     }
 
-    async forceValidate () {
+    async forceValidate (parentActions) {
+      // options.dbg && console.log('forceValidate', this.name)
       let validators = this.validators
       if (this.config.req) {
         validators = [requiredValidator, ...validators]
       }
       for (var i = 0; i < validators.length; i++) {
         try {
-          await validators[i].apply(this, [this.state.value])
+          const actions = await validators[i].apply(this, [this.state.value])
+          actions && parentActions.splice(parentActions.length, 0, ...actions)
         } catch (err) {
           // skip error
           if (this.silentValidate) {
-            console.log('silentValidate', err)
+            options.dbg && console.log('silentValidate', err)
           }
           return err
         }
@@ -484,17 +498,30 @@ module.exports = function (React, cfg, values, mainOptions) {
      *
      * @return {Array}  Errors array
      */
-    async validateAll (parentErrors, skipSetState) {
-      var errors = parentErrors || []
+    async validateAll (parentErrors, skipSetState, parentActions) {
+      // options.dbg && console.log('validateAll', parentErrors, skipSetState)
+      const errors = parentErrors || []
+      const actions = parentActions || []
 
-      const thisErr = await this.validate(skipSetState === undefined ? true : skipSetState)
+      const thisErr = await this.validate(skipSetState === undefined ? true : skipSetState, actions)
       thisErr && errors.push({
         field: this,
         err: thisErr
       })
 
       for (var key in this.props) {
-        await this.props[key].validateAll(errors, skipSetState)
+        await this.props[key].validateAll(errors, skipSetState, actions)
+      }
+      if (this === this.form) {
+        while (actions.length) {
+          const action = actions.shift()
+          console.log('validate, action', action)
+          if (!(errors.length === 0 || action.withError)) continue
+          if (action.gotoStep && this.step !== action.gotoStep) {
+            this.pushStep()
+            this.setStep(action.gotoStep)
+          }
+        }
       }
       return errors
     }
@@ -566,7 +593,7 @@ module.exports = function (React, cfg, values, mainOptions) {
 
       if (this.config.react) {
         if (typeof (this.config.react) !== 'function') {
-          console.log('.react = "%s"', this.config.react)
+          options.dbg && console.log('.react = "%s"', this.config.react)
           throw new Error('react prop is not a function')
         }
         newReactElement = React.createElement(this.Assign(this.config.react), props, ...childs)
