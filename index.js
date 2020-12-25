@@ -481,7 +481,7 @@ module.exports = function (React, cfg, values, mainOptions) {
       for (var i = 0; i < validators.length; i++) {
         try {
           const actions = await validators[i].apply(this, [this.state.value])
-          actions && parentActions.splice(parentActions.length, 0, ...actions)
+          actions && parentActions && parentActions.splice(parentActions.length, 0, ...actions)
         } catch (err) {
           // skip error
           if (this.silentValidate) {
@@ -514,7 +514,7 @@ module.exports = function (React, cfg, values, mainOptions) {
       }
       if (this === this.form) {
         while (actions.length) {
-          const action = actions.shift()
+          let action = actions.shift()
           console.log('validate, action', action)
           if (!(errors.length === 0 || action.withError)) continue
           if (action.gotoStep && this.step !== action.gotoStep) {
