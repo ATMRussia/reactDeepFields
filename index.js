@@ -22,7 +22,7 @@ module.exports = function (React, cfg, values, mainOptions) {
     constructor (config, value, nameOverride, parent) {
       const {
         props, newItem, name, type, validate, nextTickValidate,
-        onCreate, roleAndSteps, readOnlySteps, ...stripedConfig
+        onCreate, roleAndSteps, readOnlySteps, setNullSteps, ...stripedConfig
       } = config
       const tField = this
       this.config = stripedConfig
@@ -98,7 +98,7 @@ module.exports = function (React, cfg, values, mainOptions) {
       }
     }
 
-    async pushStep () {
+    pushStep () {
       const lastStepVal = this.stepValues[this.stepValues.length - 1]
       if (lastStepVal && this.step === lastStepVal.step) {
         lastStepVal.value = this.value
@@ -166,12 +166,21 @@ module.exports = function (React, cfg, values, mainOptions) {
       return allowedAtSteps.includes(this.step)
     }
 
+    get roles () {
+      return options.userRoles ? [...options.userRoles] : []
+    }
+
     setupRoleProperties () {
       const before = {};
       ['silentValidate', 'skipValidate', 'skipValue', 'readOnly'].forEach((key) => {
         this[key] = !!this[key]
         before[key] = this[key]
       })
+
+      this.allowSetNull = false
+      if (this.setNullSteps) {
+        this.allowSetNull = this.allowedAt(this.setNullSteps)
+      }
 
       if (this.roleAndSteps) {
         const found = this.allowedAt(this.roleAndSteps)
@@ -300,6 +309,8 @@ module.exports = function (React, cfg, values, mainOptions) {
         for (var key in this.props) {
           if (!this.props[key].skipValue || !useFilter) {
             val[key] = this.props[key]._getValue(useFilter)
+          } else if (this.allowSetNull && this.props[key]._getValue(useFilter) === null) {
+            val[key] = null
           }
         }
         if (!this.parent) {
@@ -401,7 +412,7 @@ module.exports = function (React, cfg, values, mainOptions) {
         // fallback
         return
       }
-      await this.form.pushStep()
+      this.form.pushStep()
       this.form.setStep(step) // go to new step
       this.value = val // set value and trigger validators
     }
@@ -438,6 +449,18 @@ module.exports = function (React, cfg, values, mainOptions) {
      */
     async validate (skipSetState) {
       if (this.skipValidate) return
+      const err = await this.forceValidate()
+      if (err) {
+        this.state.error = err
+        !skipSetState && this.setState({ ...this.state })
+      } else {
+        !skipSetState && this.state.error && this.setState({ ...this.state, error: null })
+        delete this.state.error
+      }
+      return err
+    }
+
+    async forceValidate () {
       let validators = this.validators
       if (this.config.req) {
         validators = [requiredValidator, ...validators]
@@ -449,15 +472,11 @@ module.exports = function (React, cfg, values, mainOptions) {
           // skip error
           if (this.silentValidate) {
             console.log('silentValidate', err)
-          } else {
-            this.state.error = err
-            !skipSetState && this.setState({ ...this.state })
-            return err
           }
+          return err
         }
       }
-      !skipSetState && this.state.error && this.setState({ ...this.state, error: null })
-      delete this.state.error
+      return null
     }
 
     /**
@@ -468,14 +487,14 @@ module.exports = function (React, cfg, values, mainOptions) {
     async validateAll (parentErrors, skipSetState) {
       var errors = parentErrors || []
 
-      const thisErr = await this.validate(skipSetState || true)
+      const thisErr = await this.validate(skipSetState === undefined ? true : skipSetState)
       thisErr && errors.push({
         field: this,
         err: thisErr
       })
 
       for (var key in this.props) {
-        await this.props[key].validateAll(errors)
+        await this.props[key].validateAll(errors, skipSetState)
       }
       return errors
     }
