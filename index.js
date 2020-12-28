@@ -196,10 +196,6 @@ module.exports = function (React, cfg, values, mainOptions) {
         }
         this.skipValue = !found
         this.readOnly = !found || this.config.readOnly
-        const readOnlyStep = this.allowedAt(this.readOnlySteps)
-        this.readOnly = this.readOnly || readOnlyStep
-
-        this.dbg = { found, silentValidate, readOnlyStep }
       } else if (this.readOnlySteps) {
         this.readOnly = this.allowedAt(this.readOnlySteps) || this.config.readOnly
       }
@@ -514,8 +510,8 @@ module.exports = function (React, cfg, values, mainOptions) {
       }
       if (this === this.form) {
         while (actions.length) {
-          let action = actions.shift()
-          console.log('validate, action', action)
+          const action = actions.shift()
+          options.dbg && console.log('validate, action', action)
           if (!(errors.length === 0 || action.withError)) continue
           if (action.gotoStep && this.step !== action.gotoStep) {
             this.pushStep()
