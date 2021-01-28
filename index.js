@@ -1,4 +1,5 @@
-module.exports = function (React, cfg, values, mainOptions) {
+const EventEmitter = require('events')
+function DeepFields (React, cfg, values, mainOptions) {
   const options = {
     reqErrorText: 'Поле должно быть заполненно',
     ...mainOptions,
@@ -9,7 +10,7 @@ module.exports = function (React, cfg, values, mainOptions) {
     if (!val) throw new Error(options.reqErrorText)
   }
 
-  class Field {
+  class Field extends EventEmitter {
     /**
      * constructor - Create new Field instance
      *
@@ -20,6 +21,7 @@ module.exports = function (React, cfg, values, mainOptions) {
      * @return {Field}        this field
      */
     constructor (config, value, nameOverride, parent) {
+      super()
       const {
         props, newItem, name, type, validate, nextTickValidate,
         onCreate, roleAndSteps, readOnlySteps, setNullSteps, ...stripedConfig
@@ -132,7 +134,7 @@ module.exports = function (React, cfg, values, mainOptions) {
       switch (this.type) {
         case 'array' : {
           const newValuesLen = ((values && values.length) || 0)
-          while (newValuesLen > this.props.length) {
+          while (newValuesLen < this.props.length) {
             this.rmMember(this.props.length - 1, 1)
           }
           for (let i = 0; i < newValuesLen; i++) {
@@ -567,6 +569,7 @@ module.exports = function (React, cfg, values, mainOptions) {
      */
     update () {
       this.setState && this.setState({ ...this.state })
+      this.emit('update')
     }
 
     reactElement () {
@@ -642,3 +645,27 @@ module.exports = function (React, cfg, values, mainOptions) {
   if (cfg) return new Field(cfg, values)
   return Field
 }
+
+
+/**
+ * cloneCfg - Deep immutable config clone
+ *
+ * @param  {Object} srcCfg Src config to clone
+ * @return {Object}        Clone of config
+ */
+function cloneCfg (srcCfg) {
+  const ret = {
+    ...srcCfg
+  }
+  if (srcCfg.newItem) ret.newItem = cloneCfg(srcCfg.newItem)
+  if (srcCfg.props) {
+    let props = (srcCfg.props instanceof Array) ? [ ...srcCfg.props ] : { ...srcCfg.props }
+    for (let key in props) {
+      props[key] = cloneCfg(props[key])
+    }
+    ret.props = props
+  }
+  return ret
+}
+DeepFields.cloneCfg = cloneCfg
+module.exports = DeepFields

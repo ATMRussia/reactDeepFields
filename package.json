@@ -5,7 +5,9 @@
   "scripts": {
     "makedoc": "npx jsdoc2md -f index.js > Field.md"
   },
-  "dependencies": {},
+  "dependencies": {
+    "events": "^3.2.0"
+  },
   "devDependencies": {
     "eslint": "^7.13.0",
     "eslint-config-standard": "^14.1.1",
